@@ -6,6 +6,9 @@ import (
 	"strconv"
 )
 
+const PNF = "Product not found"
+const CNF = "Cart not found"
+
 // Produkty
 func getProducts(c echo.Context) error {
 	var products []Product
@@ -43,7 +46,7 @@ func updateProduct(c echo.Context) error {
 	var product Product
 	db.First(&product, id)
 	if product.ID == 0 {
-		return c.JSON(http.StatusNotFound, "Product not found")
+		return c.JSON(http.StatusNotFound, PNF)
 	}
 	if err := c.Bind(&product); err != nil {
 		return err
@@ -115,7 +118,7 @@ func deleteCart(c echo.Context) error {
 	var cart Cart
 	db.First(&cart, id)
 	if cart.ID == 0 {
-		return c.JSON(http.StatusNotFound, "Cart not found")
+		return c.JSON(http.StatusNotFound, CNF)
 	}
 	db.Delete(&cart)
 	return c.NoContent(http.StatusNoContent)
@@ -128,15 +131,17 @@ func addProductToCart(c echo.Context) error {
 	var cart Cart
 	db.First(&cart, cartID)
 	if cart.ID == 0 {
-		return c.JSON(http.StatusNotFound, "Cart not found")
+		return c.JSON(http.StatusNotFound, CNF)
 	}
 
 	var product Product
 	db.First(&product, productID)
 	if product.ID == 0 {
-		return c.JSON(http.StatusNotFound, "Product not found")
+		return c.JSON(http.StatusNotFound, PNF)
 	}
-	db.Model(&cart).Association("Products").Append(&product)
+	if err := db.Model(&cart).Association("Products").Append(&product); err != nil {
+		return c.JSON(http.StatusInternalServerError, "Failed to add product to cart: "+err.Error())
+	}
 
 	return c.JSON(http.StatusOK, cart)
 }
@@ -148,15 +153,17 @@ func removeProductFromCart(c echo.Context) error {
 	var cart Cart
 	db.First(&cart, cartID)
 	if cart.ID == 0 {
-		return c.JSON(http.StatusNotFound, "Cart not found")
+		return c.JSON(http.StatusNotFound, CNF)
 	}
 
 	var product Product
 	db.First(&product, productID)
 	if product.ID == 0 {
-		return c.JSON(http.StatusNotFound, "Product not found")
+		return c.JSON(http.StatusNotFound, PNF)
 	}
-	db.Model(&cart).Association("Products").Delete(&product)
+	if err := db.Model(&cart).Association("Products").Delete(&product); err != nil {
+		return c.JSON(http.StatusInternalServerError, "Failed to remove product from cart: "+err.Error())
+	}
 
 	return c.JSON(http.StatusOK, cart)
 }
